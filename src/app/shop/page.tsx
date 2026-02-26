@@ -1,8 +1,12 @@
 import { Breadcrumbs } from "@/components/shared/breadcrumbs";
 import { ShopCatalog } from "@/components/shop/shop-catalog";
-import { categories } from "@/lib/mock-data";
+import { getCatalogCategories } from "@/lib/catalog-data";
 
-export default function ShopPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ShopPage() {
+  const categories = await getCatalogCategories();
+
   return (
     <div className="space-y-6">
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Shop" }]} />

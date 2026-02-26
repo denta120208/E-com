@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCart } from "@/components/providers/cart-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -32,6 +33,7 @@ interface SavedMidtransPayment {
   orderNumber: string;
   token: string;
   redirectUrl?: string;
+  selectedItemKeys?: string[];
   createdAt: string;
 }
 
@@ -43,6 +45,9 @@ function isSavedMidtransPayment(value: unknown): value is SavedMidtransPayment {
     typeof candidate.orderId === "string" &&
     typeof candidate.orderNumber === "string" &&
     typeof candidate.token === "string" &&
+    (candidate.selectedItemKeys === undefined ||
+      (Array.isArray(candidate.selectedItemKeys) &&
+        candidate.selectedItemKeys.every((item) => typeof item === "string"))) &&
     typeof candidate.createdAt === "string"
   );
 }
@@ -50,6 +55,7 @@ function isSavedMidtransPayment(value: unknown): value is SavedMidtransPayment {
 export default function PaymentPendingPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { removeItemsByKeys } = useCart();
   const orderId = searchParams.get("orderId");
   const orderNumber = searchParams.get("order_id");
   const statusCode = searchParams.get("status_code");
@@ -60,6 +66,8 @@ export default function PaymentPendingPage() {
   );
   const [resumeError, setResumeError] = useState("");
   const [resuming, setResuming] = useState(false);
+  const [syncingStatus, setSyncingStatus] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
   const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
   const isMidtransProduction = resolveMidtransClientMode(
@@ -108,6 +116,78 @@ export default function PaymentPendingPage() {
 
   const displayedOrder = orderNumber ?? orderId ?? "unknown";
 
+  const syncStatusWithMidtrans = useCallback(
+    async (silent = false) => {
+      if (!orderId && !orderNumber) return null;
+      if (!silent) {
+        setSyncingStatus(true);
+      }
+
+      try {
+        const response = await fetch("/api/payment-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId,
+            orderNumber,
+          }),
+        });
+
+        const result = (await response.json().catch(() => null)) as
+          | { message?: string; mappedStatus?: string }
+          | null;
+
+        if (!response.ok) {
+          if (!silent) {
+            setSyncMessage(result?.message ?? "Failed to check payment status.");
+          }
+          return null;
+        }
+
+        const mappedStatus = result?.mappedStatus ?? null;
+        if (!silent) {
+          setSyncMessage(result?.message ?? "Payment status checked.");
+        }
+        return mappedStatus;
+      } catch {
+        if (!silent) {
+          setSyncMessage("Failed to check payment status.");
+        }
+        return null;
+      } finally {
+        if (!silent) {
+          setSyncingStatus(false);
+        }
+      }
+    },
+    [orderId, orderNumber],
+  );
+
+  useEffect(() => {
+    let isUnmounted = false;
+
+    const checkAndRedirect = async () => {
+      const mappedStatus = await syncStatusWithMidtrans(true);
+      if (isUnmounted) return;
+      if (mappedStatus === "paid") {
+        const nextOrderId = orderId ?? savedPayment?.orderId;
+        const query = nextOrderId
+          ? `?orderId=${encodeURIComponent(nextOrderId)}`
+          : orderNumber
+            ? `?order_id=${encodeURIComponent(orderNumber)}`
+            : "";
+        router.replace(`/payment/success${query}`);
+      }
+    };
+
+    void checkAndRedirect();
+    const intervalId = window.setInterval(checkAndRedirect, 10000);
+    return () => {
+      isUnmounted = true;
+      window.clearInterval(intervalId);
+    };
+  }, [orderId, orderNumber, router, savedPayment?.orderId, syncStatusWithMidtrans]);
+
   const reopenPayment = () => {
     setResumeError("");
     if (!savedPayment?.token) {
@@ -119,6 +199,7 @@ export default function PaymentPendingPage() {
       setResuming(true);
       window.snap.pay(savedPayment.token, {
         onSuccess: () => {
+          removeItemsByKeys(savedPayment.selectedItemKeys ?? []);
           window.localStorage.removeItem(MIDTRANS_LAST_PAYMENT_STORAGE_KEY);
           router.push(`/payment/success?orderId=${encodeURIComponent(savedPayment.orderId)}`);
         },
@@ -172,7 +253,11 @@ export default function PaymentPendingPage() {
           </div>
         ) : null}
         {resumeError ? <p className="mt-2 text-sm text-red-600">{resumeError}</p> : null}
+        {syncMessage ? <p className="mt-2 text-sm text-[var(--color-text-muted)]">{syncMessage}</p> : null}
         <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Button onClick={() => void syncStatusWithMidtrans()} disabled={syncingStatus}>
+            {syncingStatus ? "Checking..." : "Check Payment Status"}
+          </Button>
           <Link href="/orders">
             <Button>Track Order</Button>
           </Link>

@@ -1,10 +1,10 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/shared/breadcrumbs";
 import { RatingStars } from "@/components/shared/rating-stars";
 import { ProductDetailActions } from "@/components/shop/product-detail-actions";
 import { Card } from "@/components/ui/card";
-import { getProductBySlug, products } from "@/lib/mock-data";
+import { getCatalogProductBySlug } from "@/lib/catalog-data";
 import { formatCurrency, toTitleCase } from "@/lib/utils";
 
 interface ProductDetailPageProps {
@@ -17,16 +17,17 @@ const reviewTemplates = [
   { id: "r3", author: "Taylor", rating: 5, comment: "Exactly as described. Good support and easy returns." },
 ];
 
-export async function generateStaticParams() {
-  return products.map((product) => ({ slug: product.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getCatalogProductBySlug(slug);
+
   if (!product) {
     notFound();
   }
+
+  const gallery = product.images.length > 0 ? product.images : [""];
 
   return (
     <div className="space-y-6">
@@ -42,17 +43,17 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         <Card className="overflow-hidden p-0">
           <div className="grid gap-3 p-3 md:grid-cols-[2fr_1fr]">
             <Image
-              src={product.images[0]}
+              src={gallery[0]}
               alt={product.name}
               width={1200}
               height={1200}
               className="h-[430px] w-full rounded-xl object-cover"
             />
             <div className="grid grid-cols-2 gap-3 md:grid-cols-1">
-              {Array.from({ length: 3 }).map((_, index) => (
+              {gallery.slice(0, 3).map((image, index) => (
                 <Image
-                  key={index}
-                  src={`${product.images[0]}?v=${index + 1}`}
+                  key={`${product.id}-${index}`}
+                  src={image}
                   alt={`${product.name} ${index + 1}`}
                   width={480}
                   height={480}

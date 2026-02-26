@@ -2,9 +2,13 @@ import Link from "next/link";
 import { ProductCard } from "@/components/shared/product-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { categories, featuredProducts, products, trendingProducts } from "@/lib/mock-data";
+import { getHomeCatalogData } from "@/lib/catalog-data";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const { categories, featuredProducts, products, trendingProducts } = await getHomeCatalogData();
+
   return (
     <div className="space-y-12">
       <section className="relative overflow-hidden rounded-3xl border border-[var(--color-border)] bg-[linear-gradient(125deg,#0f1728_10%,#15413e_48%,#2b6d5b_100%)] px-6 py-14 text-white sm:px-10">
@@ -34,7 +38,7 @@ export default function Home() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        {categories.map((category) => (
+        {categories.slice(0, 6).map((category) => (
           <Link key={category.id} href={`/shop?category=${category.slug}`}>
             <Card className="flex items-center gap-3 transition hover:-translate-y-0.5 hover:border-[var(--color-brand)]">
               <span className="text-2xl">{category.icon}</span>
@@ -72,7 +76,7 @@ export default function Home() {
             {trendingProducts.slice(0, 4).map((item) => (
               <div key={item.id} className="flex items-center justify-between rounded-xl bg-[var(--color-surface-alt)] px-3 py-2">
                 <p className="font-medium">{item.name}</p>
-                <p className="text-sm text-[var(--color-text-muted)]">{item.rating.toFixed(1)} ★</p>
+                <p className="text-sm text-[var(--color-text-muted)]">{item.rating.toFixed(1)} star</p>
               </div>
             ))}
           </div>
@@ -85,7 +89,7 @@ export default function Home() {
             {products.slice(4, 8).map((item) => (
               <div key={item.id} className="flex items-center justify-between rounded-xl border border-[var(--color-border)] px-3 py-2">
                 <p className="font-medium">{item.name}</p>
-                <p className="text-sm text-[var(--color-text-muted)]">${item.price}</p>
+                <p className="text-sm text-[var(--color-text-muted)]">${item.price.toFixed(0)}</p>
               </div>
             ))}
           </div>

@@ -85,7 +85,6 @@ export async function POST(request: Request) {
     const { error: trackingError } = await supabase.from("order_tracking").insert({
       order_id: orderRow.id,
       status: dbStatus,
-      message: label,
       label,
       occurred_at: nowIso,
     });

@@ -3,9 +3,12 @@ import { BarChart } from "@/components/admin/bar-chart";
 import { StatCard } from "@/components/admin/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { salesOverview, topSellingProducts } from "@/lib/mock-data";
+import { getAdminMetricsData } from "@/lib/admin-metrics";
+import { formatCurrency } from "@/lib/utils";
 
-export default function AdminDashboardPage() {
+export default async function AdminDashboardPage() {
+  const metrics = await getAdminMetricsData();
+
   return (
     <div className="space-y-6">
       <section className="flex flex-wrap items-end justify-between gap-4">
@@ -25,16 +28,38 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
+      {metrics.error ? (
+        <Card>
+          <p className="text-sm text-red-600">{metrics.error}</p>
+        </Card>
+      ) : null}
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Sales" value="$182,910" change="+12.4% vs last month" />
-        <StatCard label="New Users" value="1,284" change="+7.8% vs last month" />
-        <StatCard label="Orders Today" value="94" change="+9.1% vs yesterday" />
-        <StatCard label="Low Stock Alerts" value="8" change="Needs replenishment" />
+        <StatCard
+          label="Total Sales"
+          value={formatCurrency(metrics.totalSales)}
+          change={`Today ${formatCurrency(metrics.revenueToday)}`}
+        />
+        <StatCard
+          label="New Users (30d)"
+          value={metrics.newUsers.toLocaleString("en-US")}
+          change="Real profile growth"
+        />
+        <StatCard
+          label="Orders Today"
+          value={metrics.ordersToday.toLocaleString("en-US")}
+          change={`7d Revenue ${formatCurrency(metrics.revenueWeek)}`}
+        />
+        <StatCard
+          label="Low Stock Alerts"
+          value={metrics.lowStockCount.toLocaleString("en-US")}
+          change="Products with stock <= 10"
+        />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <BarChart title="Weekly Sales" points={salesOverview} />
-        <BarChart title="Best Selling Products" points={topSellingProducts} />
+        <BarChart title="Weekly Sales" points={metrics.weeklySales} />
+        <BarChart title="Best Selling Products" points={metrics.topSellingProducts} />
       </section>
 
       <Card>

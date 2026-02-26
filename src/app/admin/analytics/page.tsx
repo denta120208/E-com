@@ -1,10 +1,11 @@
 import { BarChart } from "@/components/admin/bar-chart";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { categoryBreakdown, products, salesOverview } from "@/lib/mock-data";
+import { getAdminMetricsData } from "@/lib/admin-metrics";
+import { formatCurrency } from "@/lib/utils";
 
-export default function AdminAnalyticsPage() {
-  const lowStock = products.filter((product) => product.stock < 15);
+export default async function AdminAnalyticsPage() {
+  const metrics = await getAdminMetricsData();
 
   return (
     <div className="space-y-6">
@@ -15,12 +16,18 @@ export default function AdminAnalyticsPage() {
         </p>
       </section>
 
+      {metrics.error ? (
+        <Card>
+          <p className="text-sm text-red-600">{metrics.error}</p>
+        </Card>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-2">
-        <BarChart title="Revenue by Day" points={salesOverview} />
+        <BarChart title="Revenue by Day" points={metrics.weeklySales} />
         <Card>
           <h3 className="text-lg font-semibold">Category Breakdown</h3>
           <div className="mt-4 space-y-3">
-            {categoryBreakdown.map((item) => (
+            {metrics.categoryBreakdown.map((item) => (
               <div key={item.category}>
                 <div className="flex items-center justify-between text-sm">
                   <p className="text-[var(--color-text-muted)]">{item.category}</p>
@@ -37,20 +44,14 @@ export default function AdminAnalyticsPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
-          <h3 className="text-lg font-semibold">Sales Channel Mix</h3>
+          <h3 className="text-lg font-semibold">Order Status Mix</h3>
           <ul className="mt-4 space-y-2 text-sm text-[var(--color-text-muted)]">
-            <li className="flex justify-between">
-              <span>Web Store</span>
-              <span className="font-semibold">62%</span>
-            </li>
-            <li className="flex justify-between">
-              <span>Mobile App</span>
-              <span className="font-semibold">24%</span>
-            </li>
-            <li className="flex justify-between">
-              <span>Marketplace</span>
-              <span className="font-semibold">14%</span>
-            </li>
+            {metrics.statusMix.map((item) => (
+              <li key={item.label} className="flex justify-between">
+                <span>{item.label}</span>
+                <span className="font-semibold">{item.value}</span>
+              </li>
+            ))}
           </ul>
         </Card>
 
@@ -59,15 +60,15 @@ export default function AdminAnalyticsPage() {
           <ul className="mt-4 space-y-2 text-sm text-[var(--color-text-muted)]">
             <li className="flex justify-between">
               <span>Today</span>
-              <span className="font-semibold">$13,210</span>
+              <span className="font-semibold">{formatCurrency(metrics.revenueToday)}</span>
             </li>
             <li className="flex justify-between">
-              <span>This Week</span>
-              <span className="font-semibold">$76,490</span>
+              <span>Last 7 Days</span>
+              <span className="font-semibold">{formatCurrency(metrics.revenueWeek)}</span>
             </li>
             <li className="flex justify-between">
               <span>This Month</span>
-              <span className="font-semibold">$182,910</span>
+              <span className="font-semibold">{formatCurrency(metrics.revenueMonth)}</span>
             </li>
           </ul>
         </Card>
@@ -75,7 +76,7 @@ export default function AdminAnalyticsPage() {
         <Card>
           <h3 className="text-lg font-semibold">Low Stock Alerts</h3>
           <div className="mt-4 space-y-2">
-            {lowStock.map((product) => (
+            {metrics.lowStockProducts.map((product) => (
               <div key={product.id} className="flex items-center justify-between rounded-xl bg-[var(--color-surface-alt)] px-3 py-2 text-sm">
                 <span className="text-[var(--color-text-muted)]">{product.name}</span>
                 <Badge tone="warning">{product.stock} left</Badge>

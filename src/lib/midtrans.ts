@@ -26,6 +26,17 @@ interface MidtransTransactionResponse {
   redirect_url: string;
 }
 
+export interface MidtransTransactionStatusResponse {
+  order_id?: string;
+  transaction_status?: string;
+  fraud_status?: string;
+  status_code?: string;
+  status_message?: string;
+  payment_type?: string;
+  transaction_time?: string;
+  settlement_time?: string;
+}
+
 interface SnapInstance {
   createTransaction: (payload: unknown) => Promise<MidtransTransactionResponse>;
 }
@@ -48,6 +59,10 @@ export function hasMidtransServerConfig() {
       process.env.MIDTRANS_MERCHANT_ID &&
       process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,
   );
+}
+
+function getMidtransApiBaseUrl(isProduction: boolean) {
+  return isProduction ? "https://api.midtrans.com" : "https://api.sandbox.midtrans.com";
 }
 
 export async function createMidtransTransaction(payload: MidtransChargePayload) {
@@ -103,17 +118,52 @@ export async function createMidtransTransaction(payload: MidtransChargePayload) 
   };
 }
 
+export async function fetchMidtransTransactionStatus(orderId: string) {
+  const serverKey = process.env.MIDTRANS_SERVER_KEY;
+  if (!serverKey) {
+    throw new Error("MIDTRANS_SERVER_KEY is missing");
+  }
+
+  const isProduction = resolveMidtransServerMode(serverKey, process.env.MIDTRANS_IS_PRODUCTION);
+  const authHeader = Buffer.from(`${serverKey}:`).toString("base64");
+  const response = await fetch(
+    `${getMidtransApiBaseUrl(isProduction)}/v2/${encodeURIComponent(orderId)}/status`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Basic ${authHeader}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+
+  const payload = (await response.json().catch(() => null)) as MidtransTransactionStatusResponse | null;
+  if (!response.ok || !payload) {
+    throw new Error(`Midtrans status lookup failed (${response.status})`);
+  }
+
+  return payload;
+}
+
 export function mapMidtransStatus(
   transactionStatus?: string | null,
   fraudStatus?: string | null,
 ) {
-  if (!transactionStatus) return "pending";
-  if (transactionStatus === "capture") {
-    return fraudStatus === "challenge" ? "pending" : "paid";
+  const normalizedTransactionStatus = transactionStatus?.toLowerCase();
+  const normalizedFraudStatus = fraudStatus?.toLowerCase();
+
+  if (!normalizedTransactionStatus) return "pending";
+  if (normalizedTransactionStatus === "capture") {
+    return normalizedFraudStatus === "challenge" ? "pending" : "paid";
   }
-  if (transactionStatus === "settlement") return "paid";
-  if (transactionStatus === "pending") return "pending";
-  if (transactionStatus === "deny" || transactionStatus === "expire" || transactionStatus === "cancel") {
+  if (normalizedTransactionStatus === "settlement") return "paid";
+  if (normalizedTransactionStatus === "pending") return "pending";
+  if (
+    normalizedTransactionStatus === "deny" ||
+    normalizedTransactionStatus === "expire" ||
+    normalizedTransactionStatus === "cancel"
+  ) {
     return "canceled";
   }
   return "pending";

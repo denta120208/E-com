@@ -15,9 +15,13 @@ interface ProductCardProps {
   product: Product;
 }
 
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1200&q=80";
+
 export function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useCart();
   const [wishlisted, setWishlisted] = useState(false);
+  const primaryImage = product.images[0] || FALLBACK_IMAGE;
+  const [imageFallbackEnabled, setImageFallbackEnabled] = useState(false);
 
   return (
     <Card className="group relative overflow-hidden p-0">
@@ -33,11 +37,12 @@ export function ProductCard({ product }: ProductCardProps) {
       <Link href={`/products/${product.slug}`} className="block">
         <div className="relative h-60 overflow-hidden bg-[var(--color-surface-alt)]">
           <Image
-            src={product.images[0]}
+            src={imageFallbackEnabled ? FALLBACK_IMAGE : primaryImage}
             alt={product.name}
             width={700}
             height={700}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            onError={() => setImageFallbackEnabled(true)}
           />
           <div className="pointer-events-none absolute inset-x-3 bottom-3 translate-y-6 rounded-xl bg-black/70 px-3 py-2 text-xs text-white opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
             Quick view available on product page

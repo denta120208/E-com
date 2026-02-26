@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/providers/theme-toggle";
 import { useCart } from "@/components/providers/cart-provider";
 import { useSession } from "@/components/providers/session-provider";
@@ -20,6 +20,11 @@ export function Header() {
   const { count } = useCart();
   const { user, setUser } = useSession();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const navItems = [
     ...baseNavItems,
@@ -66,7 +71,7 @@ export function Header() {
             href="/cart"
             className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm font-medium transition hover:border-[var(--color-brand)]"
           >
-            Cart ({count})
+            Cart ({mounted ? count : 0})
           </Link>
           {user ? (
             <Link

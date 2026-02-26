@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Breadcrumbs } from "@/components/shared/breadcrumbs";
-import { useCart } from "@/components/providers/cart-provider";
+import { getCartItemKey, useCart } from "@/components/providers/cart-provider";
 import { useSession } from "@/components/providers/session-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -49,7 +49,7 @@ const initialForm: CheckoutForm = {
 };
 
 export default function CheckoutPage() {
-  const { items, totals, clearCart } = useCart();
+  const { selectedItems, selectedTotals, removeItemsByKeys } = useCart();
   const { user } = useSession();
   const router = useRouter();
   const [form, setForm] = useState<CheckoutForm>(() => ({
@@ -68,7 +68,7 @@ export default function CheckoutPage() {
     process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION,
   );
 
-  const isEmpty = useMemo(() => items.length === 0, [items.length]);
+  const isEmpty = useMemo(() => selectedItems.length === 0, [selectedItems.length]);
 
   useEffect(() => {
     if (!clientKey) return;
@@ -112,7 +112,7 @@ export default function CheckoutPage() {
       const response = await fetch("/api/create-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customer: form, items }),
+        body: JSON.stringify({ customer: form, items: selectedItems }),
       });
       const result = (await response.json()) as {
         orderId?: string;
@@ -126,6 +126,8 @@ export default function CheckoutPage() {
         throw new Error(result.message || "Checkout failed");
       }
 
+      const checkoutItemKeys = selectedItems.map(getCartItemKey);
+
       if (!result.isMock && result.payment.token) {
         window.localStorage.setItem(
           MIDTRANS_LAST_PAYMENT_STORAGE_KEY,
@@ -134,6 +136,7 @@ export default function CheckoutPage() {
             orderNumber: result.orderNumber ?? "",
             token: result.payment.token,
             redirectUrl: result.payment.redirectUrl ?? "",
+            selectedItemKeys: checkoutItemKeys,
             createdAt: new Date().toISOString(),
           }),
         );
@@ -143,11 +146,10 @@ export default function CheckoutPage() {
         window.snap.pay(result.payment.token, {
           onSuccess: () => {
             window.localStorage.removeItem(MIDTRANS_LAST_PAYMENT_STORAGE_KEY);
-            clearCart();
+            removeItemsByKeys(checkoutItemKeys);
             router.push(`/payment/success?orderId=${result.orderId}`);
           },
           onPending: () => {
-            clearCart();
             router.push(`/payment/pending?orderId=${result.orderId}`);
           },
           onError: () => {
@@ -164,11 +166,9 @@ export default function CheckoutPage() {
         if (result.payment.redirectUrl.startsWith("http")) {
           window.location.href = result.payment.redirectUrl;
         } else {
-          clearCart();
           router.push(result.payment.redirectUrl);
         }
       } else {
-        clearCart();
         router.push(`/payment/pending?orderId=${result.orderId}`);
       }
     } catch (error) {
@@ -197,10 +197,10 @@ export default function CheckoutPage() {
       {isEmpty ? (
         <Card>
           <p className="text-sm text-[var(--color-text-muted)]">
-            Your cart is empty. Add items from the shop before checkout.
+            No selected items to checkout. Select items first from cart page.
           </p>
-          <Link href="/shop" className="mt-4 inline-block">
-            <Button>Go to Shop</Button>
+          <Link href="/cart" className="mt-4 inline-block">
+            <Button>Back to Cart</Button>
           </Link>
         </Card>
       ) : (
@@ -274,7 +274,7 @@ export default function CheckoutPage() {
 
           <Card className="h-fit space-y-3">
             <h2 className="text-xl font-semibold">Order Summary</h2>
-            {items.map((item) => (
+            {selectedItems.map((item) => (
               <div key={`${item.productId}-${item.size}-${item.color}`} className="flex justify-between text-sm">
                 <span className="text-[var(--color-text-muted)]">
                   {item.productName} x {item.quantity}
@@ -285,19 +285,19 @@ export default function CheckoutPage() {
             <div className="space-y-2 border-t border-[var(--color-border)] pt-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-[var(--color-text-muted)]">Subtotal</span>
-                <span>{formatCurrency(totals.subtotal)}</span>
+                <span>{formatCurrency(selectedTotals.subtotal)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[var(--color-text-muted)]">Shipping</span>
-                <span>{formatCurrency(totals.shipping)}</span>
+                <span>{formatCurrency(selectedTotals.shipping)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[var(--color-text-muted)]">Tax</span>
-                <span>{formatCurrency(totals.tax)}</span>
+                <span>{formatCurrency(selectedTotals.tax)}</span>
               </div>
               <div className="flex justify-between font-semibold">
                 <span>Total</span>
-                <span>{formatCurrency(totals.total)}</span>
+                <span>{formatCurrency(selectedTotals.total)}</span>
               </div>
             </div>
 

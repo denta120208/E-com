@@ -23,6 +23,7 @@ A complete, production-structured e-commerce scaffold built with Next.js App Rou
   - pagination
 - `/products/[slug]` Product detail with gallery, variants, stock, and reviews
 - `/cart` Cart management with quantity updates, promo estimator, shipping estimator
+- `/cart` Cart checklist per item (select which items to checkout)
 - `/checkout` Checkout form with validation and payment flow
 - `/orders` and `/orders/[id]` Order history + timeline tracking
 - `/profile` Editable profile page
@@ -42,11 +43,11 @@ A complete, production-structured e-commerce scaffold built with Next.js App Rou
 ### Admin Dashboard
 
 - `/admin` KPI overview + charts + quick actions
-- `/admin/products` CRUD-style product table + stock controls + image preview
-- `/admin/orders` status tabs + expandable rows + export actions
-- `/admin/users` role management + multi-account seller block
+- `/admin/products` Supabase-backed product CRUD with per-item edit + stock controls + image preview
+- `/admin/orders` Supabase-backed status tabs + expandable rows + status actions
+- `/admin/users` Supabase-backed role management
 - `/admin/notifications` email template editor + preview
-- `/admin/analytics` revenue + category breakdown + low stock alerts
+- `/admin/analytics` Supabase-backed revenue + category breakdown + low stock alerts
 
 ### Payment (Midtrans Ready)
 
@@ -54,6 +55,7 @@ A complete, production-structured e-commerce scaffold built with Next.js App Rou
   - creates Midtrans transaction if env keys exist
   - falls back to mock payment if env keys are missing
 - `POST /api/payment-notification` webhook handler + status sync to Supabase
+- `POST /api/payment-status` fallback status sync from Midtrans API (used when webhook is delayed/unreachable)
 - Payment result pages:
   - `/payment/success`
   - `/payment/pending`
@@ -68,6 +70,10 @@ A complete, production-structured e-commerce scaffold built with Next.js App Rou
 - `POST /api/checkout` - checkout validation (mock helper)
 - `POST /api/create-payment` - create payment and persist order + items
 - `POST /api/payment-notification` - webhook receiver and status updater
+- `POST /api/payment-status` - force-sync payment status from Midtrans by order id/number
+- `GET/POST/PATCH/DELETE /api/admin/products` - admin product management (real Supabase data)
+- `GET/PATCH /api/admin/orders` - admin order listing and status updates (real Supabase data)
+- `GET/PATCH /api/admin/users` - admin profile/role management (real Supabase data)
 
 ## Environment Setup
 
@@ -84,6 +90,10 @@ A complete, production-structured e-commerce scaffold built with Next.js App Rou
    - `NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION`
    - `MIDTRANS_ENABLED_PAYMENTS` (optional, comma-separated. Example: `gopay,qris`)
    - `APP_URL` (recommended for Midtrans callback redirects, e.g. `http://localhost:3000`)
+
+3. Set Midtrans webhook notification URL in Midtrans Dashboard:
+   - `https://your-public-domain/api/payment-notification`
+   - For local development, expose your app via tunnel (for example ngrok) because Midtrans cannot call `localhost` directly.
 
 If Midtrans keys are not set, checkout automatically runs in mock mode.
 
